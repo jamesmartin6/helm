@@ -214,13 +214,41 @@ Run: `cd backend && .venv/Scripts/python -m uvicorn app.main:app --reload`
 (after `.venv/Scripts/pip install -r requirements.txt`)
 Test: `cd backend && .venv/Scripts/python -m pytest -v`
 
-## Phase 5 — Frontend dashboard (React + TS + Vite)
+## Phase 5 — Frontend dashboard (React + TS + Vite) — DONE
 
-- [ ] `useTelemetrySocket.ts` hook
-- [ ] `TelemetryChart.tsx` — live pedal/throttle/error chart
-- [ ] `DtcPanel.tsx` — active + historical DTCs
-- [ ] `FaultInjectionPanel.tsx` — trigger faults from UI
-- [ ] End-to-end manual check: trigger fault from UI, watch chart + DTC panel respond
+- [x] `useTelemetrySocket.ts` hook — auto-reconnecting WS, 600-point rolling history
+- [x] `TelemetryChart.tsx` — live pedal/throttle/error chart, single axis, failsafe periods shaded
+- [x] `DtcPanel.tsx` — active DTC chips + full raised/cleared history
+- [x] `FaultInjectionPanel.tsx` — 3 one-click fault buttons + clear-all, trigger faults from UI
+- [x] End-to-end browser check (Playwright, headless Chromium — see below): trigger fault from
+      UI, watch chart + DTC panel respond correctly, zero console errors
+
+Colors/layout followed the `dataviz` skill: single y-axis (never dual-axis
+— pedal/throttle/error all share one 0-100%-ish scale), fixed-order
+categorical palette (blue=throttle, orange=pedal, violet=error), reserved
+status colors for DTC/failsafe state (never reused for a data series),
+legend always present, failsafe periods shown as a shaded band on the
+chart itself rather than a second axis or separate plot.
+
+**Full-stack browser verification** (QEMU firmware + backend + `npm run
+dev`, driven with Playwright since `chromium-cli` wasn't available on this
+Windows machine — a standard headless-Chromium script worked fine as a
+substitute):
+- Dashboard loads, shows "Connected", live stat tiles updating (pedal,
+  throttle, control error, actuator duty, cycle count)
+- Clicked "Stuck Pedal Sensor" in the UI → pedal jumped to 45% in the next
+  telemetry frame, throttle held at the 8% fail-safe angle, `active_dtc_mask`
+  picked up `DTC_PEDAL_PLAUSIBILITY`, status pill flipped to "FAIL-SAFE
+  ACTIVE", DTC history updated with a correctly timestamped new entry — all
+  visible together on one screenshot
+- `console --errors` equivalent (Playwright `pageerror`/`console` listeners):
+  zero errors across the whole session
+- Screenshots saved to `docs/screenshots/` for the README (note: these were
+  taken from a boot-transient failsafe state, not a clean nominal one --
+  Phase 6 should recapture a "nominal/healthy" hero screenshot with a valid
+  pedal position set first)
+
+Run: `cd frontend && npm install && cp .env.example .env.local && npm run dev`
 
 ## Phase 6 — Docker, docs, polish
 

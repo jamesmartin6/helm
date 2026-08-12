@@ -25,6 +25,7 @@ backend/.pytest_cache/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/.env.local
 
 # Env / secrets
 .env
