@@ -16,6 +16,8 @@ sil-harness/results/
 backend/.venv/
 backend/__pycache__/
 backend/**/__pycache__/
+backend/*.db
+backend/.pytest_cache/
 *.pyc
 .pytest_cache/
 

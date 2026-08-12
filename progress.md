@@ -173,14 +173,46 @@ background to confirm: all pass.
 Run: `cd sil-harness && .venv/bin/python -m pytest -v -s`
 (`HELM_HEALTHY_REGRESSION_DURATION_S=20` for a faster dev smoke-test pass)
 
-## Phase 4 — Backend telemetry service (FastAPI)
+## Phase 4 — Backend telemetry service (FastAPI) — DONE
 
-- [ ] SQLAlchemy models: Telemetry, DtcEvent, FaultInjection
-- [ ] `serial_ingest.py` — async background frame reader, CRC-validated, drop-and-log on bad frame
-- [ ] REST: GET /telemetry, /telemetry/latest, /dtcs, POST /faults/inject, POST /faults/clear, GET /health
-- [ ] WebSocket /ws/telemetry (telemetry push + dtc_change events)
-- [ ] Postgres via docker-compose; SQLite fallback for local/test runs
-- [ ] backend/tests — ingestion, endpoints, malformed-frame resilience
+- [x] SQLAlchemy models: Telemetry, DtcEvent, FaultInjection (`app/models.py`)
+- [x] `serial_link.py` — asyncio TCP connection to the firmware's UART bridge, auto-reconnect
+- [x] `serial_ingest.py` — persists every frame, tracks DTC raise/clear as DtcEvent rows, broadcasts to WS clients
+- [x] REST: GET /telemetry, /telemetry/latest, /dtcs, POST /faults/inject, POST /faults/clear, GET /health
+- [x] WebSocket /ws/telemetry (telemetry push + dtc_change events)
+- [x] Postgres (real, tested locally) + SQLite fallback for local/test runs
+- [x] backend/tests — 10 tests, ingestion, DTC event tracking, fault-injection endpoints, malformed-frame resilience
+
+**Environment note**: MSYS2's `ucrt64` Python has a nonstandard wheel tag,
+so `pydantic-core` and `uvicorn[standard]`'s `watchfiles` (both Rust
+extensions) have no matching prebuilt PyPI wheel and fail to build from
+source (`LINK : fatal error LNK1181: cannot open input file
+'python3.14.lib'`). Found a standard CPython 3.12 already installed on this
+machine at `C:\Users\James\AppData\Local\Programs\Python312-taskflow` (from
+an earlier, unrelated project) and used that to create `backend/.venv`
+instead — clean install, no further issues. Documented in
+`backend/README.md` so this doesn't get re-discovered the hard way.
+
+**Full end-to-end integration verification** (real Postgres, not just the
+SQLite-backed unit tests): started local Postgres 18 (installed via
+pacman, initialized at a scratch data dir, running on port 5433), a live
+QEMU firmware instance, and the backend pointed at both.
+- `GET /health` → `firmware_connected: true`
+- `GET /telemetry/latest`, `GET /telemetry?limit=3`, `GET /dtcs` all
+  returned correct live data reflecting the running firmware
+- WebSocket `/ws/telemetry`: 209 messages in 3s (~70Hz observed, network +
+  Python overhead on top of the firmware's 100Hz), inter-message gaps
+  averaging 14.4ms, max 31ms — no perceptible lag
+- `POST /faults/inject` (stuck pedal A) actually reached the firmware over
+  the real socket: `active_dtc_mask` flipped to include
+  `DTC_PEDAL_PLAUSIBILITY` in the very next polled telemetry frame;
+  `POST /faults/clear` returned 204 and the DTC cleared
+- `GET /dtcs` history showed correctly timestamped raised_at/cleared_at
+  pairs for the full sequence, including the injected fault
+
+Run: `cd backend && .venv/Scripts/python -m uvicorn app.main:app --reload`
+(after `.venv/Scripts/pip install -r requirements.txt`)
+Test: `cd backend && .venv/Scripts/python -m pytest -v`
 
 ## Phase 5 — Frontend dashboard (React + TS + Vite)
 
