@@ -12,6 +12,10 @@ void test_plausibility_raises_at_exact_fault_cycle_count(void);
 void test_plausibility_clears_at_exact_clear_cycle_count(void);
 void test_plausibility_no_false_positives_on_healthy_pair(void);
 void test_plausibility_intermittent_bad_cycles_do_not_accumulate(void);
+void test_protocol_telemetry_roundtrip(void);
+void test_protocol_command_roundtrip(void);
+void test_protocol_crc_mismatch_detected_and_resyncs(void);
+void test_protocol_crc16_known_vector(void);
 
 int main(void) {
     test_pid_step_response();
@@ -20,6 +24,10 @@ int main(void) {
     test_plausibility_clears_at_exact_clear_cycle_count();
     test_plausibility_no_false_positives_on_healthy_pair();
     test_plausibility_intermittent_bad_cycles_do_not_accumulate();
+    test_protocol_telemetry_roundtrip();
+    test_protocol_command_roundtrip();
+    test_protocol_crc_mismatch_detected_and_resyncs();
+    test_protocol_crc16_known_vector();
 
     printf("\n%d/%d checks passed\n", helm_test_count - helm_test_failures, helm_test_count);
     if (helm_test_failures > 0) {

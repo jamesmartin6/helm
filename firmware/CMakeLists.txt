@@ -14,9 +14,11 @@ if(HELM_BUILD_HOST_TESTS)
         test/unit/test_main.c
         test/unit/test_pid.c
         test/unit/test_plausibility.c
+        test/unit/test_protocol.c
         src/plant_sim.c
         src/pid.c
         src/plausibility.c
+        src/protocol.c
     )
     target_include_directories(helm_host_tests PRIVATE src test/unit)
     if(NOT MSVC)

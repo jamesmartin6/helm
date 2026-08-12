@@ -1,6 +1,5 @@
 # Firmware build artifacts
 firmware/build/
-firmware/third_party/FreeRTOS-Kernel/
 *.elf
 *.bin
 *.hex
