@@ -1,0 +1,41 @@
+# Firmware build artifacts
+firmware/build/
+firmware/third_party/FreeRTOS-Kernel/
+*.elf
+*.bin
+*.hex
+*.map
+*.o
+*.a
+
+# Python
+sil-harness/.venv/
+sil-harness/__pycache__/
+sil-harness/**/__pycache__/
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Postgres data volume
+pgdata/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
