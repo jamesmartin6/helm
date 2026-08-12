@@ -1,0 +1,43 @@
+services:
+  firmware:
+    build: ./firmware
+    # No host port mapping needed -- only the backend talks to this, over
+    # the compose network using the service name as hostname.
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: helm
+      POSTGRES_PASSWORD: helm
+      POSTGRES_DB: helm
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U helm"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      HELM_DATABASE_URL: postgresql+asyncpg://helm:helm@postgres:5432/helm
+      HELM_FIRMWARE_HOST: firmware
+      HELM_FIRMWARE_PORT: "5678"
+    ports:
+      - "8000:8000"
+    depends_on:
+      firmware:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

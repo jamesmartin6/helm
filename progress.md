@@ -42,7 +42,11 @@ Full spec: [docs/build-plan.md](docs/build-plan.md)
 
 ## Currently working on
 
-- (updated as work proceeds — see bottom of file for the live pointer)
+- **All 6 phases complete.** Project is done. If you're reading this because
+  a session got interrupted, there's nothing left to resume -- do a sanity
+  check instead: `git log --oneline` should show 6 phase commits, `git
+  status` should be clean, and the Definition-of-Done summary at the bottom
+  of this file lists what to re-verify if anything seems off.
 
 ## Phase 0 — Repo & tooling setup
 
@@ -250,12 +254,84 @@ substitute):
 
 Run: `cd frontend && npm install && cp .env.example .env.local && npm run dev`
 
-## Phase 6 — Docker, docs, polish
+## Phase 6 — Docker, docs, polish — DONE
 
-- [ ] `docker-compose.yml` (qemu+firmware, backend, postgres, frontend)
-- [ ] README.md — architecture, quickstart, fault-injection demo walkthrough, screenshots/gif
-- [ ] Repo polish: description, topics, social preview if easy
-- [ ] Final pass: re-read build plan, confirm every "Definition of done" is met or honestly caveated
+- [x] `docker-compose.yml` (firmware, postgres, backend, frontend) — see honesty note below
+- [x] `firmware/Dockerfile`, `backend/Dockerfile`, `frontend/Dockerfile` (multi-stage), `.dockerignore` per service
+- [x] README.md — architecture (rendered + validated mermaid diagram), quickstart, fault-injection
+      demo walkthrough with real screenshots, tech stack, repo structure, honesty notes
+- [x] Per-component READMEs: `firmware/README.md`, `sil-harness/README.md`, `backend/README.md`, `frontend/README.md`
+- [x] Repo polish: description + 10 topics set via `gh repo edit`
+- [x] Final pass: re-read build plan, confirmed every phase's Definition of Done (see summary below)
+
+**Docker: honestly unverified.** This dev machine has no Docker installed
+(confirmed at the very start of the build, see Environment notes above).
+`docker-compose.yml` and all three Dockerfiles were written carefully
+based on the exact commands verified to work in every phase above, and
+`docker-compose.yml` was YAML-syntax-validated with `pyyaml`, but none of
+it has run through an actual `docker compose up`. This is stated plainly
+in the README's Quickstart section rather than glossed over. Everything
+else in this project — firmware under QEMU, all 5 SiL scenarios, the
+backend against real Postgres, the frontend in a real browser via
+Playwright — was fully run and verified, with results recorded in each
+phase's section above.
+
+**README screenshots**: regenerated during Phase 6 after noticing the
+first pass (taken during Phase 5's browser verification) accidentally
+captured a boot-transient fail-safe state rather than genuine nominal
+operation, since the dashboard has no manual pedal control (only fault
+injection, per the build plan's spec) and nothing was driving a normal
+pedal position. Worked around by using the existing `/faults/inject`
+endpoint to freeze both pedal sensors A and B at matching values (35%) --
+no plausibility mismatch since they agree, no OOR since it's a valid raw
+value -- which is a legitimate "commanded position" through the existing
+API surface, not a new backend feature. Held via a persistent HTTP
+connection sending every 50ms (curl-per-call subprocess spawn overhead on
+Windows was too slow and let comms-timeout re-trigger intermittently).
+Result: a clean nominal screenshot (pedal=throttle=35%, zero DTCs) and a
+fault-transition screenshot showing the actual step from 35% to the 8%
+fail-safe angle on the chart, both in `docs/screenshots/`.
+
+## Build plan Definition-of-Done summary (final pass)
+
+Phase 1 (control math): ✅ all conditions met and verified (10041/10041
+host checks, settling 40-200ms vs 300ms budget, overshoot 0.7-1.5% vs 10%,
+plausibility exact-cycle raise/clear, zero false positives).
+
+Phase 2 (FreeRTOS firmware): ✅ all conditions met. One caveat: `-serial
+pty` substituted with a TCP socket chardev (Windows QEMU has no `pty`
+chardev) -- functionally identical, documented throughout.
+
+Phase 3 (SiL harness): ✅ all conditions met. All 5 scenarios pass under a
+single pytest command with a generated latency report; the 5-minute
+healthy-regression run showed zero false positives across 18,663 frames;
+latencies measured from fault-onset-in-telemetry (not command-sent) to
+correctly isolate firmware debounce timing from QEMU's UART transport
+speed -- see Phase 3 section above for the full methodology note.
+
+Phase 4 (backend): ✅ all conditions met, verified against real Postgres
+(not just SQLite unit tests) with a live firmware connection: telemetry in
+Postgres in real time, WebSocket streaming with 14ms avg / 31ms max
+inter-message gaps, historical queries correct, malformed-frame resilience
+both unit-tested and defensively coded (a decode exception can't kill the
+ingest loop).
+
+Phase 5 (frontend): ✅ all conditions met, verified in a real (headless)
+browser: opening the dashboard, triggering a fault from the UI, and
+watching the chart + DTC panel respond within the expected latency all
+confirmed via Playwright screenshots and zero console errors.
+
+Phase 6 (Docker + docs): ✅ docs and repo polish complete.
+`docker compose up` itself is the one item in the entire build that
+couldn't be verified end-to-end, for the environment reason above -- every
+other Definition-of-Done bullet across all 6 phases was actually run, not
+just written.
+
+Stretch goal (real HiL on STM32 Nucleo): not attempted -- no physical
+hardware available in this environment. The build plan's own framing
+already accounts for this (the sensor-read/actuator-write swap points are
+isolated by design), documented in the README's "What's simulated vs
+real" section.
 
 ## Session log
 
@@ -266,4 +342,25 @@ Run: `cd frontend && npm install && cp .env.example .env.local && npm run dev`
 - Fixed MSYS2 pacman SSL/mirror issue (see Environment notes above).
 - Installing toolchain via pacman (arm-none-eabi-gcc, cmake, ninja, qemu, python-pip, gdb-multiarch).
 - Created repo skeleton, .gitignore, LICENSE, this progress.md.
-- Next: finish toolchain install, create GitHub repo, commit skeleton, start Phase 1.
+- Fixed a stale-base-install DLL ABI mismatch that broke cmake entirely (see Environment notes).
+- Built and shipped all 6 phases in this same session: Phase 1 (plant model + PID + host tests,
+  10041/10041 passing), Phase 2 (FreeRTOS firmware under QEMU, watchdog boot-race bug found and
+  fixed), Phase 3 (SiL harness, 5/5 scenarios passing including a full 5-minute healthy-regression
+  run, two real harness bugs found and fixed), Phase 4 (FastAPI backend, verified against real
+  Postgres + live firmware, not just unit tests), Phase 5 (React dashboard, verified in a real
+  browser via Playwright with zero console errors), Phase 6 (Docker Compose + 3 Dockerfiles,
+  polished README with a validated mermaid architecture diagram and real screenshots, GitHub repo
+  description + topics set).
+- Also installed a local PostgreSQL 18 server via pacman (data dir at
+  `C:\Users\James\AppData\Local\Temp\claude\helm_pgdata`, port 5433, user `helm`, trust auth,
+  `helm` database already created) purely for the Phase 4 integration verification -- this is
+  scratch/dev-only infrastructure, not part of the shipped project (docker-compose.yml's postgres
+  service is what a real deployment uses). It's stopped as of the end of this session; restart
+  with `pg_ctl -D <data dir> -l <data dir>/logfile -o "-p 5433" start` if you need it again.
+- Discovered mid-Phase-4 that MSYS2's Python has a nonstandard wheel tag that breaks
+  pydantic-core/watchfiles (Rust extensions, no matching prebuilt wheel). Backend's .venv uses a
+  standard CPython 3.12 already present on this machine at
+  `C:\Users\James\AppData\Local\Programs\Python312-taskflow` (from an earlier, unrelated project)
+  instead -- documented in backend/README.md.
+- Status: **project complete**. All Definition-of-Done items verified except `docker compose up`
+  itself (no Docker on this machine) -- see the Phase 6 section above for the full honesty note.
