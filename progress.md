@@ -52,18 +52,30 @@ Full spec: [docs/build-plan.md](docs/build-plan.md)
 - [ ] GitHub repo created, initial commit pushed
 - [ ] progress.md committed and used as the running task ledger
 
-## Phase 1 — Plant model + PID control math (host-testable, no RTOS)
+## Phase 1 — Plant model + PID control math (host-testable, no RTOS) — DONE
 
-- [ ] `firmware/src/config.h` — named constants from build plan table
-- [ ] `firmware/src/plant_sim.c/.h` — discrete motor + spring-return throttle plate model
-- [ ] `firmware/src/pid.c/.h` — PID with anti-windup, output clamp [-100,100]
-- [ ] `firmware/src/plausibility.c/.h` — dual-sensor plausibility state machine
-- [ ] `firmware/test/unit/` — host-side test runner (plain C + assert, or Unity/CMocka)
-  - [ ] settling time / overshoot tests across >=5 step sizes
-  - [ ] plausibility fault raised at exactly PLAUSIBILITY_FAULT_CYCLES
-  - [ ] plausibility clear at exactly PLAUSIBILITY_CLEAR_CYCLES
-  - [ ] no false positives on healthy matched sensor pairs
-- [ ] CMake host-test target wired up, all tests passing
+- [x] `firmware/src/config.h` — named constants from build plan table
+- [x] `firmware/src/plant_sim.c/.h` — discrete motor + spring-return throttle plate model
+- [x] `firmware/src/pid.c/.h` — PID with anti-windup, output clamp [-100,100]
+- [x] `firmware/src/plausibility.c/.h` — dual-sensor plausibility state machine
+- [x] `firmware/test/unit/` — host-side test runner (plain C + assert, no external deps)
+  - [x] settling time / overshoot tests across 5 step sizes (10/25/50/75/95%)
+  - [x] plausibility fault raised at exactly PLAUSIBILITY_FAULT_CYCLES
+  - [x] plausibility clear at exactly PLAUSIBILITY_CLEAR_CYCLES
+  - [x] no false positives on healthy matched sensor pairs
+- [x] CMake host-test target wired up, all 10041 checks passing
+
+Tuned gains (build plan's starting values were too slow for the plant physics
+I picked, so retuned per the build plan's own instruction to tune against
+these tests): `PID_KP=8.0 PID_KI=3.0 PID_KD=0.1`. Plant constants tuned so a
+full-range actuator sweep is physically possible within the settling window
+(real ETC actuators are ~100-150ms full range): `PLANT_MOTOR_TIME_CONSTANT_S=0.03`,
+`PLANT_MOTOR_GAIN=6.0`, `PLANT_SPRING_RETURN_RATE_PCT_S=60.0`. Results:
+settling 40-200ms (max 300ms), overshoot 0.7-1.5% (max 10%), all 5 step sizes.
+
+Build/run: `cd firmware && mkdir build && cd build && cmake -G Ninja .. && ninja && ./helm_host_tests.exe`
+(needs `arm-none-eabi-gcc`/etc NOT required for this target — just system gcc via
+`/c/msys64/ucrt64/bin` on PATH).
 
 ## Phase 2 — FreeRTOS firmware under QEMU
 
