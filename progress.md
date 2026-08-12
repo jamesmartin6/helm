@@ -18,8 +18,24 @@ Full spec: [docs/build-plan.md](docs/build-plan.md)
   (skips cert verification for mirror downloads only — package integrity is
   still checked by pacman's own signature/checksum verification). If pacman
   breaks again, check this line is still present.
+- **Stale base install / DLL ABI mismatch**: this MSYS2 install had a base
+  system from ~Feb 2025. Installing fresh packages (cmake 4.4.2 etc.) on top
+  of old shared libs (zstd, curl, openssl...) caused
+  `STATUS_ENTRY_POINT_NOT_FOUND` (exit -1073741511) when running cmake/etc.
+  Fixed with a full `pacman -Su --noconfirm` (twice — once for core
+  msys2-runtime/bash/pacman itself, then again for the ucrt64 package set).
+  If any msys2-provided tool silently fails to launch with no output, this is
+  the first thing to suspect — run `pacman -Su` again.
+- **Bash tool shell can go stale after upgrading msys2-runtime/bash/pacman**:
+  the persistent shell process keeps old DLLs mapped. If a plain `pacman`
+  Bash call starts returning bare exit 127 with zero output after an
+  msys2-runtime upgrade, that's why — either tolerate it (new Bash tool calls
+  get fresh processes) or drive the upgrade from PowerShell instead.
 - Host C compiler for Phase 1 unit tests: mingw64 `gcc` at
   `/c/msys64/ucrt64/bin/gcc` (or mingw64/bin).
+- PATH: `/c/msys64/ucrt64/bin:/c/msys64/usr/bin` is appended in `~/.bashrc`
+  so `gcc`, `arm-none-eabi-gcc`, `cmake`, `ninja`, `qemu-system-arm`,
+  `python3`, `gdb-multiarch` are all on PATH in fresh Bash tool shells.
 - No Docker installed on this machine — Phase 6 docker-compose is written but
   cannot be verified by running it here. Note this honestly in the README
   rather than claiming it was tested.
