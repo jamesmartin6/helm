@@ -1,5 +1,6 @@
 # Firmware build artifacts
 firmware/build/
+firmware/build-arm/
 *.elf
 *.bin
 *.hex

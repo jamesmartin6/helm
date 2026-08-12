@@ -77,21 +77,42 @@ Build/run: `cd firmware && mkdir build && cd build && cmake -G Ninja .. && ninja
 (needs `arm-none-eabi-gcc`/etc NOT required for this target — just system gcc via
 `/c/msys64/ucrt64/bin` on PATH).
 
-## Phase 2 — FreeRTOS firmware under QEMU
+## Phase 2 — FreeRTOS firmware under QEMU — DONE
 
-- [ ] Vendor FreeRTOS-Kernel (git submodule or plain copy, per README call-out)
-- [ ] `firmware/src/protocol.c/.h` — frame encode/decode + CRC16/CCITT-FALSE
-- [ ] `firmware/src/tasks/sensor_task.c`
-- [ ] `firmware/src/tasks/control_task.c`
-- [ ] `firmware/src/tasks/actuator_task.c`
-- [ ] `firmware/src/tasks/diag_task.c` — DTC state machine, failsafe
-- [ ] `firmware/src/tasks/comms_task.c` — UART TX/RX framing
-- [ ] `firmware/src/watchdog.c`
-- [ ] CMake arm-none-eabi toolchain file + mps2-an385 linker script
-- [ ] Builds to `build/helm.elf`
-- [ ] Runs under `qemu-system-arm -M mps2-an385 -kernel build/helm.elf -serial pty`
-- [ ] Telemetry frames readable on PTY at ~100Hz
-- [ ] Watchdog trips and forces failsafe when a task is artificially stalled
+- [x] Vendor FreeRTOS-Kernel (plain copy, pruned to ARM_CM3 port, V10.6.2)
+- [x] `firmware/src/protocol.c/.h` — frame encode/decode + CRC16/CCITT-FALSE (host-tested in Phase 1 CMake target too)
+- [x] `firmware/src/tasks/sensor_task.c` — dual raw sensor synthesis, fault-override application, plausibility checks
+- [x] `firmware/src/tasks/control_task.c` — PID loop, failsafe setpoint override, telemetry assembly, watchdog heartbeat
+- [x] `firmware/src/tasks/actuator_task.c` — applies duty to plant_sim, publishes actual throttle angle
+- [x] `firmware/src/tasks/diag_task.c` — DTC state machine (plausibility + OOR + comms-timeout + watchdog), failsafe latch
+- [x] `firmware/src/tasks/comms_task.c` — UART TX (telemetry) + RX (command decode, dispatch, ACK)
+- [x] `firmware/src/watchdog.c` — independent watchdog task with startup grace period
+- [x] CMake arm-none-eabi toolchain file + mps2-an385 linker script (adapted from FreeRTOS's own CORTEX_MPS2_QEMU_IAR_GCC demo)
+- [x] Builds to `firmware/build-arm/helm.elf` (+ `helm_watchdog_test.elf` debug variant)
+- [x] Runs under QEMU — **PTY substituted with a TCP socket chardev** (Windows QEMU has no `pty` chardev; see Windows note below), verified via a Python probe script decoding live frames
+- [x] Telemetry frames readable at exactly 100Hz (verified: cycle count advances 1:1 with elapsed ms/10)
+- [x] Watchdog trips and forces failsafe when a task is artificially stalled (verified via `helm_watchdog_test` debug build: `DTC_WATCHDOG_TRIP` sets, throttle latches to `FAILSAFE_THROTTLE_PCT`, stays latched)
+- [x] Closed-loop verified end-to-end: sent `SET_PEDAL_OVERRIDE 40%` command frame, watched throttle converge to ~40% and DTCs clear (comms-timeout clears once commands flow; OOR clears once pedal leaves the near-zero rail)
+
+**Windows QEMU note:** the build plan specifies `-serial pty`, which is POSIX-only.
+On Windows, this project uses a TCP socket chardev instead:
+`-chardev socket,id=serial0,host=127.0.0.1,port=<PORT>,server=on,wait=off -serial chardev:serial0`.
+Functionally identical (a byte stream the backend/harness connects to) and
+portable to POSIX hosts too, so Phase 3/4 standardize on this rather than PTY.
+
+**Watchdog boot-race bug found and fixed**: the watchdog task's first deadline
+check could race control_task's very first heartbeat increment, latching a
+false `DTC_WATCHDOG_TRIP` at boot on every run. Fixed with a 3-control-period
+startup grace delay before the watchdog begins its first comparison
+(`firmware/src/watchdog.c`).
+
+Build/run:
+```
+cd firmware/build-arm  # cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=../cmake/arm-none-eabi-toolchain.cmake .. && ninja
+qemu-system-arm -M mps2-an385 -nographic -kernel helm.elf \
+  -chardev socket,id=serial0,host=127.0.0.1,port=5678,server=on,wait=off \
+  -serial chardev:serial0 -monitor none
+```
 
 ## Phase 3 — SiL test harness & fault injection
 
