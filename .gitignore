@@ -12,6 +12,7 @@ firmware/build-arm/
 sil-harness/.venv/
 sil-harness/__pycache__/
 sil-harness/**/__pycache__/
+sil-harness/results/
 backend/.venv/
 backend/__pycache__/
 backend/**/__pycache__/
